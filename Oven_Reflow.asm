@@ -2,7 +2,6 @@
 ; Also generates a 2kHz signal at P0.0 using timer 0 interrupt.
 ; Also keeps a BCD counter using timer 2 interrupt.
 
-$MODDE2
 
 CLK 		  EQU 33333333
 FREQ_0 		  EQU 2000
@@ -40,6 +39,7 @@ BSEG
 mf			:  dbit 1
 
 $include(math32.asm)
+$include(LCD_Display.asm)
 
 CSEG
 
@@ -281,6 +281,7 @@ State0:  ;Functionality for state 0
 	jnb Key.1,$
 	mov State_Sec,#0
 	mov State,#1
+	lcall Not_Safe_To_Remove
 	ljmp M0
 	
 State1:  ;Functionality for state 1
@@ -300,7 +301,14 @@ State1_Abort: ;Checks if 60 seconds pass before Thermocouple hits 50 Degrees
 	jnc Continue_in_State
 	mov state,#5
 	ljmp M0
-	 
+
+Continue_in_State:  ;The exit state test failed, Machine will continue in current state its in the middle so that its in range of everything
+	jb Key.2,Dont_Abort	; Also checks if user wants to cancel the reflow process 
+	mov State,#5
+Dont_Abort:
+	ret
+	
+		 
 State2: ;Functionality for state 2
 	cjne a,#2,State3
 	mov Pulse,#20
@@ -342,94 +350,9 @@ State5:	;Functionality for state 5  (State 5 waits to see if temperature is belo
 	subb a,#60
 	jnc Continue_in_State
 	mov State,#0
+	lcall Safe_to_Remove
 	ljmp M0
-	
-	
-	
-Continue_in_State:  ;The exit state test failed, Machine will continue in current state 
-	jb Key.2,Dont_Abort	; Also checks if user wants to cancel the reflow process 
-	mov State,#5
-Dont_Abort:
-	ret
-	
-	
-;Id love to make this section a seperate file, But I don't know if I can so its going to take up a lot of room.
-Wait40us:
-	mov R0, #149
-	
-X1: 
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	djnz R0, X1 ; 9 machine cycles-> 9*30ns*149=40us
-    ret
 
-LCD_command:
-	mov	LCD_DATA, A
-	clr	LCD_RS
-	nop
-	nop
-	setb LCD_EN ; Enable pulse should be at least 230 ns
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	clr	LCD_EN
-	ljmp Wait40us
-
-LCD_put:
-	mov	LCD_DATA, A
-	setb LCD_RS
-	nop
-	nop
-	setb LCD_EN ; Enable pulse should be at least 230 ns
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	clr	LCD_EN
-	ljmp Wait40us
-	
-Current_State:
-
-	lcall Wait40us
-	djnz R1, Current_State
-
-	; Move to first column of first row	
-	mov a, #0xc0
-	lcall LCD_command
-		
-	; Display letter A
-	mov a, #'S'
-	lcall LCD_put
-	
-	mov a, #'t'
-	lcall LCD_put
-	
-	mov a, #'a'
-	lcall LCD_put
-	
-	mov a, #'t'
-	lcall LCD_put
-	
-	mov a, #'e'
-	lcall LCD_put
-	
-	mov a, #' '
-	lcall LCD_put
-	
-	mov a,State
-	anl a,#0FH
-	orl a,#30H
-	lcall LCD_put
-	
-    ret
+	ret	
 END
 
