@@ -23,4 +23,6 @@
 *.i*86
 *.x86_64
 *.hex
-*Math32.asm
+/Math32.asm
+*.lst
+*.bat
