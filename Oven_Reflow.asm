@@ -9,6 +9,7 @@ FREQ_0 		  EQU 2000
 FREQ_2 		  EQU 100
 BAUD   		  EQU 115200
 T2LOAD 		  EQU 65536-(FREQ/(32*BAUD))
+TIMER1_RELOAD EQU 65536-(CLK/(12*FREQ_2))
 TIMER0_RELOAD EQU 65536-(CLK/(12*2*FREQ_0))
 TIMER2_RELOAD EQU 65536-(CLK/(12*FREQ_2))
 CE_ADC 		  EQU p0.3
@@ -46,6 +47,7 @@ mf			:  dbit 1
 $include(math32.asm)
 $include(LCD_Display.asm)
 $include(Temp_Check.asm)
+$include(PWM.asm)
 
 
 CSEG
@@ -79,7 +81,7 @@ ISR_timer2:
 	
 ;Seconds		Can use this timer incase we decide to have a clock 
 	mov a, Seconds
-	inc a
+	add a,#1
 	da a
 	mov Seconds, a
 	cjne a,#60H,do_nothing
@@ -87,7 +89,7 @@ ISR_timer2:
 	
 ;Minutes
 	mov a,Minutes
-	inc a
+	add a,#1
 	da a
 	mov Minutes,a
 	cjne a,#60H,do_nothing
@@ -103,12 +105,6 @@ do_nothing:
 	reti
 
 	
-ISR_timer0:
-	cpl P0.0
-    mov TH0, #high(TIMER0_RELOAD)
-    mov TL0, #low(TIMER0_RELOAD)
-	reti
-	
 ;For a 33.33MHz clock, one cycle takes 30ns
 WaitHalfSec:
 	mov R2, #90
@@ -118,6 +114,14 @@ L1: djnz R0, L1
 	djnz R1, L2
 	djnz R2, L3
 	ret
+Small_Delay:
+	mov R2, #50
+L31: mov R1, #50
+L21: mov R0, #140
+L11: djnz R0, L11
+	djnz R1, L21
+	djnz R2, L31
+	ret
 	
 myprogram:  ; Set inputs/outputs depending on what whoever does the board solders 
 	mov SP, #7FH
@@ -125,6 +129,7 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov LEDRB,#0
 	mov LEDRC,#0
 	mov LEDG,#0
+	clr p1.1
 	mov Temperature,#0
 	mov State_Sec,#0
 	mov State_Minute,#0
@@ -149,7 +154,7 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	
 
 	mov P0MOD, #00000011B ; P0.0, P0.1 are outputs.  P0.1 is used for testing Timer 2!
-	setb P0.0
+	mov P1MOD, #11111111B
 	orl P0MOD, #00111000b ; make all CEs outputs  
     orl P3MOD, #11111111b ; make all CEs outputs 
 	orl p0mod,#00001000b
@@ -190,6 +195,9 @@ M0:			;The pins here will need to be changed depending on what whoever made the 
 	
 Update_Display: 
 ;-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+;		THERE IS SOMETHING WRONG WITH THE DISPLAY
+;			Internally the seconds are counting correctly but they are displaying wrong.
+;
 ;			Update the Display for the Clock 
 ;
 ;			It also currently displays the variable I'm using for state transitions so its going to jump all over the place
@@ -199,23 +207,23 @@ Update_Display:
 
 	mov dptr, #myLUT
 ; Display State_Sec 0
-    mov A,State_Sec
+    mov A,Seconds			
     anl A, #0FH
     movc A, @A+dptr
     mov HEX2, A
 ; Display State_Sec 1
-	mov A,State_Sec
+	mov A,Seconds
     swap A
     anl A, #0FH
     movc A, @A+dptr
     mov HEX3, A	
 ;Display Minutes 0
-	mov A,State_Minute
+	mov A,Minutes
 	anl A, #0FH
     movc A, @A+dptr
     mov HEX4, A
 ;Display Minutes 1
-	mov A,State_Minute
+	mov A,Minutes
     swap A
     anl A, #0FH
     movc A, @A+dptr
@@ -245,22 +253,6 @@ DO_SPI_G_LOOP:
 	mov R1, a
 	clr SCLK
 	djnz R2, DO_SPI_G_LOOP
-	ret
-
-Correct_Temp:  ;Turns the LM355 voltage output into the current temperature 100*(Vout-2.73) Vout=(ADC/1023)*5
-				  ; For oven reflow project Find out the conversion from the Hot junction and add here
-	Load_y(500)
-	lcall mul32
-	
-	Load_y(100)
-	lcall mul32
-	
-	Load_y(1023)
-	lcall div32
-	
-	Load_y(27300)
-	lcall sub32 
-	
 	ret
 	
 	
