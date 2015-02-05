@@ -4,14 +4,18 @@
 
 
 CLK 		  EQU 33333333
+FREQ   		  EQU 33333333
 FREQ_0 		  EQU 2000
 FREQ_2 		  EQU 100
+BAUD   		  EQU 115200
+T2LOAD 		  EQU 65536-(FREQ/(32*BAUD))
 TIMER0_RELOAD EQU 65536-(CLK/(12*2*FREQ_0))
 TIMER2_RELOAD EQU 65536-(CLK/(12*FREQ_2))
 CE_ADC 		  EQU p0.3
 SCLK   		  EQU p0.2
 MOSI   		  EQU P0.1
 MISO   		  EQU p0.0
+
 
 org 0000H
 	ljmp myprogram
@@ -26,6 +30,7 @@ DSEG at 30H
 BCD_count	:  ds 1
 Cnt_10ms 	:  ds 1
 State_Sec	:  ds 1
+State_Minute:  ds 1
 Seconds  	:  ds 1
 Minutes  	:  ds 1
 Pulse       :  ds 1
@@ -40,6 +45,8 @@ mf			:  dbit 1
 
 $include(math32.asm)
 $include(LCD_Display.asm)
+$include(Temp_Check.asm)
+
 
 CSEG
 
@@ -87,7 +94,7 @@ ISR_timer2:
 	mov Minutes,#0
 	
 do_nothing:
-	lcall update_display  ;Updates display on Hex to display current time
+	;lcall update_display  ;Updates display on Hex to display current time
 	pop dph
 	pop dpl
 	pop acc
@@ -120,11 +127,13 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov LEDG,#0
 	mov Temperature,#0
 	mov State_Sec,#0
+	mov State_Minute,#0
 	mov Seconds,#0
 	mov Minutes,#0
 	mov State,#0
 	
-	
+	lcall INI_SPI
+		
 	setb LCD_ON  ;All this code is to prep the LCD
   	setb LCD_blON
     clr LCD_EN  ; Default state of enable must be zero
@@ -138,13 +147,12 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov a, #01H ; Clear screen (Warning, very slow command!)
 	lcall LCD_command
 	
-	
+
 	mov P0MOD, #00000011B ; P0.0, P0.1 are outputs.  P0.1 is used for testing Timer 2!
 	setb P0.0
 	orl P0MOD, #00111000b ; make all CEs outputs  
     orl P3MOD, #11111111b ; make all CEs outputs 
 	orl p0mod,#00001000b
-	lcall INI_SPI
 
     mov TMOD,  #00000001B ; GATE=0, C/T*=0, M1=0, M0=1: 16-bit timer
 	clr TR0 ; Disable timer 0
@@ -170,24 +178,12 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
     setb EA  ; Enable all interrupts
 
 M0:			;The pins here will need to be changed depending on what whoever made the board decided to use.
-	cpl LEDRA.0
+	;cpl LEDRA.0
 	clr p3.7
-	clr CE_ADC
-	mov R0,#00000001B ; Start bit:1
-	lcall DO_SPI_G
-	mov R0,#10000000B ; Single ended, read channel 0
-	
-	lcall DO_SPI_G
-	mov a, R1 ; R1 contains bits 8 and 9
-	anl a, #03H ; Make sure other bits are zero
-	mov x+1,a
-	mov LEDRB, a ; Display the bits
-	
-	mov R0, #55H ; It doesn't matter what we transmit...
-	lcall DO_SPI_G
-	mov LEDRA, R1 ; R1 contains bits 0 to 7
-	mov x+0,r1
-	setb CE_ADC
+	lcall Read_ADC_Voltage
+	lcall correct_temp
+	lcall hex2bcd				; Turns the HEX into BCD
+	lcall Update_Display			; Calls subroutine to display on Hex
 	lcall WaitHalfSec
 	lcall State_Transition
 	sjmp M0
@@ -203,23 +199,23 @@ Update_Display:
 
 	mov dptr, #myLUT
 ; Display State_Sec 0
-    mov A,Seconds
+    mov A,State_Sec
     anl A, #0FH
     movc A, @A+dptr
     mov HEX2, A
 ; Display State_Sec 1
-	mov A,Seconds
+	mov A,State_Sec
     swap A
     anl A, #0FH
     movc A, @A+dptr
     mov HEX3, A	
 ;Display Minutes 0
-	mov A,Minutes
+	mov A,State_Minute
 	anl A, #0FH
     movc A, @A+dptr
     mov HEX4, A
 ;Display Minutes 1
-	mov A,Minutes
+	mov A,State_Minute
     swap A
     anl A, #0FH
     movc A, @A+dptr
@@ -251,7 +247,7 @@ DO_SPI_G_LOOP:
 	djnz R2, DO_SPI_G_LOOP
 	ret
 
-Correct_Voltage:  ;Turns the LM355 voltage output into the current temperature 100*(Vout-2.73) Vout=(ADC/1023)*5
+Correct_Temp:  ;Turns the LM355 voltage output into the current temperature 100*(Vout-2.73) Vout=(ADC/1023)*5
 				  ; For oven reflow project Find out the conversion from the Hot junction and add here
 	Load_y(500)
 	lcall mul32
