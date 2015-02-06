@@ -50,7 +50,7 @@ Current_State:
 	djnz R1, Current_State
 
 	; Move to first column of first row	
-	mov a, #0xc0
+	mov a, #80H
 	lcall LCD_command
 		
 	; Display letter A
@@ -220,6 +220,277 @@ Continue_dude:
 	mov HEX2, a
 	
 	ret
-  
+
+	
+user0:	
+	;load a with swithes to check what the user wants to set
+	mov a, SWA	
+	cjne a, #01H, user1
+	
+	mov a, #0A8H
+	lcall LCD_command
+	
+	;------Display the User Settable Soak Temp
+	
+	mov a, #'S'
+	lcall LCD_put
+	mov a, #'o'
+	lcall LCD_put
+	mov a, #'a'
+	lcall LCD_put
+	mov a, #'k'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #'T'
+	lcall LCD_put
+	mov a, #'e'
+	lcall LCD_put
+	mov a, #'m'
+	lcall LCD_put
+	mov a, #'p'
+	lcall LCD_put
+	mov a, #':'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	
+	mov x+0, soaktemp
+	mov x+1, #0
+	mov x+2, #0
+	mov x+3, #0
+	lcall hex2bcd
+	
+	mov a, bcd+1
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+
+	mov a, bcd+0
+	swap a
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	mov a, bcd+0
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	ret
+	
+user1:
+	mov a, SWA
+	cjne a, #02H, user2
+	
+	;----move to second line of LCD_Display
+	mov a, #0A8H
+	lcall LCD_command
+	
+	mov a, #'S'
+	lcall LCD_put
+	mov a, #'o'
+	lcall LCD_put
+	mov a, #'a'
+	lcall LCD_put
+	mov a, #'k'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #'T'
+	lcall LCD_put
+	mov a, #'i'
+	lcall LCD_put
+	mov a, #'m'
+	lcall LCD_put
+	mov a, #'e'
+	lcall LCD_put
+	mov a, #':'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	
+	mov x+0, soaktime
+	mov x+1, #0
+	mov x+2, #0
+	mov x+3, #0
+	lcall hex2bcd
+	
+	mov a, bcd+1
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+
+	mov a, bcd+0
+	swap a
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	mov a, bcd+0
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	ret	
+
+user2:
+	mov a, SWA
+	cjne a, #04H, user3
+	
+	;----move to second line of LCD_Display
+	mov a, #0A8H
+	lcall LCD_command
+	
+	mov a, #'R'
+	lcall LCD_put
+	mov a, #'e'
+	lcall LCD_put
+	mov a, #'f'
+	lcall LCD_put
+	mov a, #'l'
+	lcall LCD_put
+	mov a, #'o'
+	lcall LCD_put
+	mov a, #'w'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #'T'
+	lcall LCD_put
+	mov a, #'e'
+	lcall LCD_put
+	mov a, #'m'
+	lcall LCD_put
+	mov a, #'p'
+	lcall LCD_put
+	mov a, #':'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	
+	
+	mov x+0, reflowtemp
+	mov x+1, #0
+	mov x+2, #0
+	mov x+3, #0
+	lcall hex2bcd
+	
+	mov a, bcd+1
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+
+	mov a, bcd+0
+	swap a
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	mov a, bcd+0
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	ret	
+	
+user3:
+	mov a, SWA
+	cjne a, #08H, done
+	
+	;----move to second line of LCD_Display
+	mov a, #0A8H
+	lcall LCD_command	
+	
+	mov a, #'R'
+	lcall LCD_put
+	mov a, #'e'
+	lcall LCD_put
+	mov a, #'f'
+	lcall LCD_put
+	mov a, #'l'
+	lcall LCD_put
+	mov a, #'o'
+	lcall LCD_put
+	mov a, #'w'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #'T'
+	lcall LCD_put
+	mov a, #'i'
+	lcall LCD_put
+	mov a, #'m'
+	lcall LCD_put
+	mov a, #'e'
+	lcall LCD_put
+	mov a, #':'
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	
+	
+	mov x+0, reflowtime
+	mov x+1, #0
+	mov x+2, #0
+	mov x+3, #0
+	lcall hex2bcd
+	
+	mov a, bcd+1
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+
+	mov a, bcd+0
+	swap a
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	mov a, bcd+0
+	anl a, #0FH
+	orl a, #30H
+	lcall LCD_put
+	
+	ret
+	
+done:
+;clear bottom line
+	mov a, #0A8H
+	lcall LCD_command
+	
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put
+	mov a, #' '
+	lcall LCD_put	
+	ret	
 end
 $LIST

@@ -33,6 +33,7 @@ Cnt_10ms 	:  ds 1
 State_Sec	:  ds 1
 State_Minute:  ds 1
 Seconds  	:  ds 1
+Channel     :  ds 1
 Minutes  	:  ds 1
 Pulse       :  ds 1
 Temperature :  ds 1
@@ -40,6 +41,13 @@ State       :  ds 1
 x			:  ds 4
 y			:  ds 4
 bcd			:  ds 5
+cold_Junk   :  ds 2
+hot_Junk    :  ds 2
+Reflowtime  :  ds 1
+ReflowTemp  :  ds 1
+Cnt_10ms_2  :  ds 1
+SoakTemp    :  ds 1
+SoakTime    :  ds 1
 
 BSEG
 mf			:  dbit 1
@@ -48,6 +56,7 @@ $include(math32.asm)
 $include(LCD_Display.asm)
 $include(Temp_Check.asm)
 $include(PWM.asm)
+$include(Delays.asm)
 
 
 CSEG
@@ -94,9 +103,8 @@ ISR_timer2:
 	mov Minutes,a
 	cjne a,#60H,do_nothing
 	mov Minutes,#0
-	
+
 do_nothing:
-	;lcall update_display  ;Updates display on Hex to display current time
 	pop dph
 	pop dpl
 	pop acc
@@ -104,25 +112,41 @@ do_nothing:
 	
 	reti
 
-	
-;For a 33.33MHz clock, one cycle takes 30ns
-WaitHalfSec:
-	mov R2, #90
-L3: mov R1, #250
-L2: mov R0, #250
-L1: djnz R0, L1
-	djnz R1, L2
-	djnz R2, L3
-	ret
-Small_Delay:
-	mov R2, #50
-L31: mov R1, #50
-L21: mov R0, #140
-L11: djnz R0, L11
-	djnz R1, L21
-	djnz R2, L31
-	ret
-	
+ISR_timer0:
+	; Timer 1 in 16-bit mode doesn't have autoreload.  So it is up
+	; to us to reload the timer:
+    mov TH0, #high(TIMER0_RELOAD)
+    mov TL0, #low(TIMER0_RELOAD)
+    
+    ; Any used register in this ISR must be saved in the stack
+    push acc
+    push psw ; The carry flag resides in the program status word register
+    
+    ; Increment the 10 ms counter.  If it is equal to 100 reset it to zero
+    inc Cnt_10ms_2
+    mov a, Cnt_10ms_2
+    cjne a, #100, No_reset_Cnt_10ms
+    mov Cnt_10ms_2, #0
+No_reset_Cnt_10ms:
+
+	; Compare the variable 'pwm' against 'Cnt_10ms' and change the output pin
+	; accordingly: if Cnt_10ms<=pwm then P0.0=1 else P0.0=0
+	mov a, Cnt_10ms_2
+	clr c ; Before subtraction we need to clear the 'borrow'
+	subb a, pulse
+	jc pwm_GT_Cnt_10ms ; After subtraction the carry is set if pwm>Cnt_10ms
+	clr P1.1
+	sjmp Done_PWM
+pwm_GT_Cnt_10ms:
+	setb P1.1
+Done_PWM:	
+   
+    ; Restore saved registers from the stack in reverse order
+    pop psw
+    pop acc
+	reti
+
+		
 myprogram:  ; Set inputs/outputs depending on what whoever does the board solders 
 	mov SP, #7FH
 	mov LEDRA,#0
@@ -136,6 +160,7 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov Seconds,#0
 	mov Minutes,#0
 	mov State,#0
+	mov Pulse,#0
 	
 	lcall INI_SPI
 		
@@ -159,13 +184,18 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
     orl P3MOD, #11111111b ; make all CEs outputs 
 	orl p0mod,#00001000b
 
-    mov TMOD,  #00000001B ; GATE=0, C/T*=0, M1=0, M0=1: 16-bit timer
+   
+    mov a, TMOD
+	anl a, #11110000B ; Set the bits for timer 0 to zero.  Keep the bits of timer 1 unchanged.
+    orl a, #00000001B ; GATE=0, C/T*=0, M1=0, M0=1: 16-bit timer
+    mov TMOD, a
 	clr TR0 ; Disable timer 0
 	clr TF0
     mov TH0, #high(TIMER0_RELOAD)
     mov TL0, #low(TIMER0_RELOAD)
     setb TR0 ; Enable timer 0
     setb ET0 ; Enable timer 0 interrupt
+
     
         
     mov T2CON, #00H ; Autoreload is enabled, work as a timer
@@ -185,9 +215,19 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 M0:			;The pins here will need to be changed depending on what whoever made the board decided to use.
 	;cpl LEDRA.0
 	clr p3.7
-	lcall Read_ADC_Voltage
-	lcall correct_temp
-	lcall hex2bcd				; Turns the HEX into BCD
+	lcall User_Temp
+	lcall cold_junction ; fix cold_junction voltage to temp
+	lcall Hex2BCD ; put x into bcd
+	mov cold_junk, BCD ; put BCD into a variable
+	lcall hot_junction ; fix hot_junction voltage to temp
+	lcall Hex2BCD ; put x into bcd
+	mov hot_junk, BCD ; put BCD into a variable
+
+; add cold_junk and hot_junk together and put them in temperature
+
+	mov a, cold_junk
+	add a, hot_junk
+	mov temperature, a 
 	lcall Update_Display			; Calls subroutine to display on Hex
 	lcall WaitHalfSec
 	lcall State_Transition
@@ -256,8 +296,8 @@ DO_SPI_G_LOOP:
 	ret
 	
 	
-State_Transition:  ;Function made to transition states, call it in the main when you want to check the current state/change to another 
-			       ; Alternitivly move it into an interupt, im not positive how this is going to function yet.  
+State_Transition:  ;Function made to transition states, call it in the main when you want to check the current state/change to another   
+			     ; Alternitivly move it into an interupt, im not positive how this is going to function yet.  
 	lcall Current_State
 	mov a, State ;Moves state into a
 	
@@ -338,9 +378,50 @@ State5:	;Functionality for state 5  (State 5 waits to see if temperature is belo
 	subb a,#60
 	jnc Continue_in_State
 	mov State,#0
-	lcall Safe_to_Remove
 	ljmp M0
 
 	ret	
+	
+hot_junction:
+	
+	mov channel, #01000000B ; move value of the channel 0 into channel
+	lcall read_ADC ; put channel into x
+	
+	load_y(500)
+	lcall mul32
+	
+	load_y(1972386)
+	lcall mul32
+	
+	load_y(1023)
+	lcall div32
+	
+	load_y(538461378)
+	lcall sub32
+	
+	ret
+
+cold_junction:
+	
+	mov channel, #10000000B ;move the value of channel 1 into channel
+	lcall read_ADC ;put channel into x
+
+	load_y(500)
+	lcall mul32
+	
+	load_y(100)
+	lcall mul32
+	
+	load_y(1023)
+	lcall div32
+	
+	load_y(27300)
+	lcall sub32
+	
+	load_y(100)
+	lcall mul32	
+	
+	ret
 END
+
 
