@@ -4,7 +4,7 @@ Read_ADC:
 	mov R0,#00000001B ; Start bit:1
 	lcall DO_SPI_G
 	
-	mov R0,#10000000B ; Single ended, read channel 0 
+	mov R0,#Channel ; Single ended, read channel 0 
 	lcall DO_SPI_G
 	mov a, R1 ; R1 contains bits 8 and 9
 	anl a, #03H ; Make sure other bits are zero
