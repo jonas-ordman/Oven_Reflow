@@ -339,7 +339,7 @@ user2:
 	cjne a, #04H, user3
 	
 	;----move to second line of LCD_Display
-	mov a, #80H
+	mov a, #0A8H
 	lcall LCD_command
 	
 	mov a, #'R'

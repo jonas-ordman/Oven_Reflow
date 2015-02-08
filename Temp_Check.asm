@@ -4,12 +4,8 @@ Read_ADC:
 	mov R0,#00000001B ; Start bit:1
 	lcall DO_SPI_G
 	
-	mov a, b
-	swap a
-	anl a, #0F0H
-	setb acc.7 ; Single mode (bit 7).
+	mov R0,#10000000B ; Single ended, read channel 0
 	
-	mov R0,a
 	lcall DO_SPI_G
 	mov a, R1 ; R1 contains bits 8 and 9
 	anl a, #03H ; Make sure other bits are zero
@@ -80,26 +76,26 @@ M0_done:
 	
 hot_junction:
 	
-	mov channel, #0 ; move value of the channel 1 into channel
+	;mov channel, #1 ; move value of the channel 1 into channel
 	lcall read_ADC ; put channel into x
 	
 	load_y(500)
 	lcall mul32
 	
-	load_y(1972386)
+	load_y(19723)
 	lcall mul32
 	
 	load_y(1023)
 	lcall div32
 	
-	load_y(538461378)
-	lcall sub32
+;	load_y(5384615)
+;	lcall sub32
 	
 	ret
 
 cold_junction:
 	
-	mov r0,#1 ;move the value of channel 0 into channel
+	;mov r0,#0 ;move the value of channel 0 into channel
 	lcall read_ADC ;put channel into x
 
 	load_y(500)
@@ -113,9 +109,6 @@ cold_junction:
 	
 	load_y(27300)
 	lcall sub32
-	
-	load_y(100)
-	lcall mul32	
 	
 	ret
 $LISTmov

@@ -173,8 +173,7 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov Reflowtime,#45
 	mov reflowtemp,#210
 	mov soaktemp,#150
-	
-	mov Hot_Junk,#0
+
 	
 	lcall INI_SPI
 		
@@ -193,8 +192,8 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	
 
 
-	orl P0MOD, #00000000b ; make all CEs outputs 
-	orl P1MOD, #00001000b
+	orl P0MOD, #00010000b ; make all CEs outputs 
+	orl P1MOD, #00010000b
     orl P3MOD, #11111111b ; make all CEs outputs 
 
 
@@ -202,6 +201,8 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
     mov a, TMOD
 	anl a, #11110000B ; Set the bits for timer 0 to zero.  Keep the bits of timer 1 unchanged.
     orl a, #00000001B ; GATE=0, C/T*=0, M1=0, M0=1: 16-bit timer
+    setb CE_ADC
+    orl P0MOD, #00010000b
     mov TMOD, a
 	clr TR0 ; Disable timer 0
 	clr TF0
@@ -233,17 +234,19 @@ M0:			;The pins here will need to be changed depending on what whoever made the 
 	lcall cold_junction ; fix cold_junction voltage to temp
 	mov cold_junk, X ; put BCD into a variable
 	
-	;lcall hot_junction ; fix hot_junction voltage to temp
+	lcall hot_junction ; fix hot_junction voltage to temp
 	;lcall Hex2BCD ; put x into bcd
 	;mov hot_junk, X ; put BCD into a variable
-; add cold_junk and hot_junk together and put them in temperature
+    ;add cold_junk and hot_junk together and put them in temperature
 
-	mov a,hot_junk
-	mov b,Cold_junk
-	add a,b
-	mov temperature, a
+	;mov a,hot_junk
+	;mov b,Cold_junk
+	;add a,b
+	;mov temperature, a
+	;mov x,a
 	lcall hex2bcd
 	lcall current_temp 
+;	lcall Display_BCD
 	lcall Update_Display			; Calls subroutine to display on Hex
 	lcall WaitHalfSec
 	lcall State_Transition
@@ -288,9 +291,9 @@ Update_Display:
     ret
     
 INI_SPI:
-	orl P0MOD,#01001000b ; Set SCLK, MOSI as outputs
-	orl P1MOD,#00001000b
-	anl P0MOD,#11111110b ; Set MISO as input
+	orl P0MOD,#01010000b ; Set CE, SCLK, MOSI as outputs
+	orl P1MOD,#00010000b
+	anl P1MOD,#11111110b ; Set MISO as input
 	clr SCLK ; Mode 0,0 default
 	ret
 
