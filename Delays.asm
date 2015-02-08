@@ -16,5 +16,14 @@ L4: djnz R0, L4
 	djnz R1, L5
 	djnz R2, L6
 	ret
+
+Button_Delay:
+	mov R2, #20
+L9: mov R1, #20
+L8: mov R0, #110
+L7: djnz R0, L7
+	djnz R1, L8
+	djnz R2, L9
+	ret
 	
 $LIST

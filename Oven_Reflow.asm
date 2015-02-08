@@ -48,15 +48,18 @@ ReflowTemp  :  ds 1
 Cnt_10ms_2  :  ds 1
 SoakTemp    :  ds 1
 SoakTime    :  ds 1
+Buzz_Timer  :  ds 1
 
 BSEG
 mf			:  dbit 1
+Buzzer_Flag :  dbit 1
 
 $include(math32.asm)
 $include(LCD_Display.asm)
 $include(Temp_Check.asm)
 $include(PWM.asm)
 $include(Delays.asm)
+$include(Buzzer.asm)
 
 
 CSEG
@@ -82,10 +85,11 @@ ISR_timer2:
 	cjne a, #100, do_nothing
 	
 	mov Cnt_10ms, #0
-	
+	lcall Count_Down_Buzz
 ;State_Sec    The seconds for State Transitions
 	mov a, State_Sec
 	inc a
+	lcall bcd2hex
 	mov State_Sec, a
 	
 ;Seconds		Can use this timer incase we decide to have a clock 
@@ -142,6 +146,9 @@ pwm_GT_Cnt_10ms:
 Done_PWM:	
    
     ; Restore saved registers from the stack in reverse order
+    jnb Buzzer_Flag,Skip_Buzz
+    cpl p0.0
+Skip_Buzz:
     pop psw
     pop acc
 	reti
@@ -153,6 +160,7 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov LEDRB,#0
 	mov LEDRC,#0
 	mov LEDG,#0
+	clr Buzzer_flag
 	clr p1.1
 	mov Temperature,#0
 	mov State_Sec,#0
@@ -247,7 +255,7 @@ Update_Display:
 
 	mov dptr, #myLUT
 ; Display State_Sec 0
-    mov A,Seconds			
+    mov A,Seconds		
     anl A, #0FH
     movc A, @A+dptr
     mov HEX2, A
@@ -304,30 +312,36 @@ State_Transition:  ;Function made to transition states, call it in the main when
 State0:  ;Functionality for state 0
 	cjne a,#0,State1
 	mov State_Sec,#0
+	mov Seconds,#0
+	mov Minutes,#0
 	mov Pulse,#0
 	jb Key.1,Continue_in_State
 	jnb Key.1,$
 	mov State_Sec,#0
 	mov State,#1
+	lcall make_buzz
 	lcall Not_Safe_To_Remove
 	ljmp M0
 	
 State1:  ;Functionality for state 1
 	cjne a,#1,State2
 	mov Pulse,#100
-	mov a,#150
+	mov a,soaktemp
 	clr c
 	subb a,Temperature
 	jnc State1_Abort
 	mov State,#2
+	mov State_Sec,#0
+	lcall make_buzz
 	ljmp M0
 
 State1_Abort: ;Checks if 60 seconds pass before Thermocouple hits 50 Degrees
-	mov a,#60
+	mov a,#60H
 	clr c
 	subb a,State_Sec
 	jnc Continue_in_State
 	mov state,#5
+	lcall make_buzz
 	ljmp M0
 
 Continue_in_State:  ;The exit state test failed, Machine will continue in current state its in the middle so that its in range of everything
@@ -340,32 +354,35 @@ Dont_Abort:
 State2: ;Functionality for state 2
 	cjne a,#2,State3
 	mov Pulse,#20
-	mov a,#60
+	mov a,soaktime
 	clr c
 	subb a,State_Sec
 	jnc Continue_in_State
 	mov State,#3
+	lcall make_buzz
 	ljmp M0
 
 State3:	;Functionality for state 3
 	cjne a,#3,State4
 	mov Pulse,#100
 	mov State_Sec,#0
-	mov a,#220
+	mov a,Reflowtemp
 	clr c
 	subb a,Temperature
 	jnc Continue_in_State
 	mov State,#4
+	lcall make_buzz
 	ljmp M0
 	
 State4:	;Functionality for state 4
 	cjne a,#4,State5
 	mov Pulse,#20
-	mov a,#45
+	mov a,Reflowtime
 	clr c
 	subb a,State_Sec
 	jnc Continue_in_State
-	mov State,#4
+	mov State,#5
+	lcall make_buzz
 	ljmp M0
 	
 State5:	;Functionality for state 5  (State 5 waits to see if temperature is below 60 Degrees to see if its safe to remove 
@@ -378,6 +395,7 @@ State5:	;Functionality for state 5  (State 5 waits to see if temperature is belo
 	subb a,#60
 	jnc Continue_in_State
 	mov State,#0
+	lcall make_buzz
 	ljmp M0
 
 	ret	

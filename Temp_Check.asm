@@ -40,7 +40,7 @@ User_Temp:
 M0_0:
 	cjne a, #1, M0_1
 	jb KEY.3, M0_done
-	jnb KEY.3, $
+	lcall Button_Delay
 	mov a, SWC
 	anl a, #02H
 	cjne a, #02H, decsoaktemp
@@ -52,10 +52,11 @@ decsoaktemp:
 M0_1:
 	cjne a, #2, M0_2
 	jb KEY.3, M0_done
-	jnb KEY.3, $
+	lcall Button_Delay
 	mov a, SWC
 	anl a, #02H
 	cjne a, #02H, decsoaktime
+	mov a,soaktime
 	inc soaktime
 	ljmp M0_done
 decsoaktime:
@@ -64,7 +65,7 @@ decsoaktime:
 M0_2:
 	cjne a, #4, M0_3
 	jb KEY.3, M0_done
-	jnb KEY.3, $
+	lcall Button_Delay
 	mov a, SWC
 	anl a, #02H
 	cjne a, #02H, decreflowtemp
@@ -76,7 +77,7 @@ decreflowtemp:
 M0_3:
 	cjne a, #8, M0_done
 	jb KEY.3, M0_done
-	jnb KEY.3, $
+	lcall Button_Delay
 	mov a, SWC
 	anl a, #02H
 	cjne a, #02H, decreflowtime
