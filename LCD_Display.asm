@@ -339,7 +339,7 @@ user2:
 	cjne a, #04H, user3
 	
 	;----move to second line of LCD_Display
-	mov a, #0A8H
+	mov a, #80H
 	lcall LCD_command
 	
 	mov a, #'R'
@@ -492,5 +492,56 @@ done:
 	mov a, #' '
 	lcall LCD_put	
 	ret	
+	
+Current_Temp:
+	lcall Wait40us
+	djnz R1, Current_Temp
+
+	; Move to first column of first row	
+	mov a, #89H
+	lcall LCD_command
+	mov dptr, #MyLUT
+	
+	mov r0,bcd+2
+	cjne r0,#0,Turn_ona
+	sjmp not_100a
+Turn_ona:
+	mov a, bcd+2
+	anl a,#0FH
+	orl a,#30H
+	lcall LCD_PUT
+	
+	sjmp Continue_Dudea
+	
+Not_100a:
+	mov a,#' '
+	
+Continue_dudea:			
+	mov a, bcd+1
+	swap a
+	anl a,#0FH
+	orl a, #30H
+	lcall LCD_Put
+	
+	mov a, bcd+1
+	anl a,#0FH
+	orl a,#30H
+	lcall LCD_PUt
+	
+	mov a,#'.'
+	lcall LCD_PUT
+	
+	mov a, bcd+0
+	swap a
+	anl a,#0FH
+	orl a, #30H
+	lcall LCD_PUt
+	
+	mov a, bcd+0
+	anl a,#0FH
+	orl a,#30H
+	lcall LCD_put
+	
+    ret	    
 end
 $LIST

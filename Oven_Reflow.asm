@@ -12,10 +12,10 @@ T2LOAD 		  EQU 65536-(FREQ/(32*BAUD))
 TIMER1_RELOAD EQU 65536-(CLK/(12*FREQ_2))
 TIMER0_RELOAD EQU 65536-(CLK/(12*2*FREQ_0))
 TIMER2_RELOAD EQU 65536-(CLK/(12*FREQ_2))
-CE_ADC 		  EQU p0.3
-SCLK   		  EQU p0.2
-MOSI   		  EQU P0.1
-MISO   		  EQU p0.0
+CE_ADC 		  EQU p0.4
+SCLK   		  EQU p1.4
+MOSI   		  EQU P0.6
+MISO   		  EQU p1.0
 
 
 org 0000H
@@ -147,7 +147,7 @@ Done_PWM:
    
     ; Restore saved registers from the stack in reverse order
     jnb Buzzer_Flag,Skip_Buzz
-    cpl p0.0
+    cpl p3.7
 Skip_Buzz:
     pop psw
     pop acc
@@ -169,6 +169,12 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	mov Minutes,#0
 	mov State,#0
 	mov Pulse,#0
+	mov Soaktime,#60
+	mov Reflowtime,#45
+	mov reflowtemp,#210
+	mov soaktemp,#150
+	
+	mov Hot_Junk,#0
 	
 	lcall INI_SPI
 		
@@ -186,11 +192,11 @@ myprogram:  ; Set inputs/outputs depending on what whoever does the board solder
 	lcall LCD_command
 	
 
-	mov P0MOD, #00000011B ; P0.0, P0.1 are outputs.  P0.1 is used for testing Timer 2!
-	mov P1MOD, #11111111B
-	orl P0MOD, #00111000b ; make all CEs outputs  
+
+	orl P0MOD, #00000000b ; make all CEs outputs 
+	orl P1MOD, #00001000b
     orl P3MOD, #11111111b ; make all CEs outputs 
-	orl p0mod,#00001000b
+
 
    
     mov a, TMOD
@@ -225,17 +231,19 @@ M0:			;The pins here will need to be changed depending on what whoever made the 
 	clr p3.7
 	lcall User_Temp
 	lcall cold_junction ; fix cold_junction voltage to temp
-	lcall Hex2BCD ; put x into bcd
-	mov cold_junk, BCD ; put BCD into a variable
-	lcall hot_junction ; fix hot_junction voltage to temp
-	lcall Hex2BCD ; put x into bcd
-	mov hot_junk, BCD ; put BCD into a variable
-
+	mov cold_junk, X ; put BCD into a variable
+	
+	;lcall hot_junction ; fix hot_junction voltage to temp
+	;lcall Hex2BCD ; put x into bcd
+	;mov hot_junk, X ; put BCD into a variable
 ; add cold_junk and hot_junk together and put them in temperature
 
-	mov a, cold_junk
-	add a, hot_junk
-	mov temperature, a 
+	mov a,hot_junk
+	mov b,Cold_junk
+	add a,b
+	mov temperature, a
+	lcall hex2bcd
+	lcall current_temp 
 	lcall Update_Display			; Calls subroutine to display on Hex
 	lcall WaitHalfSec
 	lcall State_Transition
@@ -280,7 +288,8 @@ Update_Display:
     ret
     
 INI_SPI:
-	orl P0MOD,#00000110b ; Set SCLK, MOSI as outputs
+	orl P0MOD,#01001000b ; Set SCLK, MOSI as outputs
+	orl P1MOD,#00001000b
 	anl P0MOD,#11111110b ; Set MISO as input
 	clr SCLK ; Mode 0,0 default
 	ret
@@ -400,46 +409,6 @@ State5:	;Functionality for state 5  (State 5 waits to see if temperature is belo
 
 	ret	
 	
-hot_junction:
-	
-	mov channel, #01000000B ; move value of the channel 0 into channel
-	lcall read_ADC ; put channel into x
-	
-	load_y(500)
-	lcall mul32
-	
-	load_y(1972386)
-	lcall mul32
-	
-	load_y(1023)
-	lcall div32
-	
-	load_y(538461378)
-	lcall sub32
-	
-	ret
-
-cold_junction:
-	
-	mov channel, #10000000B ;move the value of channel 1 into channel
-	lcall read_ADC ;put channel into x
-
-	load_y(500)
-	lcall mul32
-	
-	load_y(100)
-	lcall mul32
-	
-	load_y(1023)
-	lcall div32
-	
-	load_y(27300)
-	lcall sub32
-	
-	load_y(100)
-	lcall mul32	
-	
-	ret
-END
+End
 
 
